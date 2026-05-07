@@ -130,7 +130,7 @@ for (const agent of agents) {
   });
 
   // Register webhook route
-  app.use(webhookPath, bot.webhookCallback(webhookPath));
+  app.post(webhookPath, (req, res) => bot.handleUpdate(req.body, res));
 
   // Set webhook on startup
   if (WEBHOOK_BASE) {
