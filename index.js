@@ -151,6 +151,10 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', bots: botsStarted });
 });
 
+app.post('/test', (req, res) => {
+  res.json({ received: req.body });
+});
+
 app.listen(PORT, () => {
   console.log(`\nTelegram Agents running on port ${PORT}`);
   console.log(`${botsStarted} bot(s) active\n`);
