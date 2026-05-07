@@ -55,6 +55,7 @@ for (const agent of agents) {
   const token = process.env[tokenEnvKey];
 
   if (!token) continue; // Skip agents without a token configured
+  console.log(`Loading ${agent.name} with token: ${token.substring(0, 10)}...`);
 
   const systemPrompt = loadPrompt(agent.slug, agent.name, agent.title, agent.emoji);
   const bot = new Telegraf(token);
@@ -62,10 +63,14 @@ for (const agent of agents) {
 
   // /start command
   bot.start(async (ctx) => {
-    await ctx.reply(
-      `Hey! I'm *${agent.name}*, your ${agent.emoji} *${agent.title}*.\n\nSend me anything — a task, a question, a problem. I'm here to help.`,
-      { parse_mode: 'Markdown' }
-    );
+    try {
+      await ctx.reply(
+        `Hey! I'm *${agent.name}*, your ${agent.emoji} *${agent.title}*.\n\nSend me anything — a task, a question, a problem. I'm here to help.`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (err) {
+      console.error(`[${agent.name}] /start reply error:`, err.message);
+    }
   });
 
   // /clear command — reset conversation history
