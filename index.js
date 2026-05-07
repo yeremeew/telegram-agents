@@ -165,6 +165,19 @@ app.get('/debug-key', (req, res) => {
   res.json({ length: key.length, starts: key.substring(0, 15), ends: key.slice(-6) });
 });
 
+app.get('/test-claude', async (req, res) => {
+  try {
+    const result = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 10,
+      messages: [{ role: 'user', content: 'say hi' }]
+    });
+    res.json({ ok: true, text: result.content[0].text });
+  } catch (err) {
+    res.json({ ok: false, error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\nTelegram Agents running on port ${PORT}`);
   console.log(`${botsStarted} bot(s) active\n`);
