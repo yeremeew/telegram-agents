@@ -160,6 +160,11 @@ app.post('/test', (req, res) => {
   res.json({ received: req.body });
 });
 
+app.get('/debug-key', (req, res) => {
+  const key = (process.env.ANTHROPIC_API_KEY || '').trim();
+  res.json({ length: key.length, starts: key.substring(0, 15), ends: key.slice(-6) });
+});
+
 app.listen(PORT, () => {
   console.log(`\nTelegram Agents running on port ${PORT}`);
   console.log(`${botsStarted} bot(s) active\n`);
