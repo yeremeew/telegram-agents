@@ -52,7 +52,7 @@ let botsStarted = 0;
 
 for (const agent of agents) {
   const tokenEnvKey = `BOT_TOKEN_${agent.slug.toUpperCase().replace(/-/g, '_')}`;
-  const token = process.env[tokenEnvKey];
+  const token = (process.env[tokenEnvKey] || '').trim();
 
   if (!token) continue; // Skip agents without a token configured
   console.log(`Loading ${agent.name} with token: ${token.substring(0, 10)}...`);
