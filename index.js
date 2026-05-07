@@ -9,7 +9,7 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const anthropic = new Anthropic({ apiKey: (process.env.ANTHROPIC_API_KEY || '').trim() });
 const WEBHOOK_BASE = process.env.WEBHOOK_BASE_URL; // e.g. https://your-server.com
 const PORT = process.env.PORT || 3000;
 
