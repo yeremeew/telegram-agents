@@ -151,6 +151,114 @@ for (const agent of agents) {
   botsStarted++;
 }
 
+// ── Team Coordinator Bot ──────────────────────────────────────────────────────
+const COORDINATOR_TOKEN = (process.env.BOT_TOKEN_TEAM_COORDINATOR || '').trim();
+
+if (COORDINATOR_TOKEN) {
+  const coordinator = new Telegraf(COORDINATOR_TOKEN);
+
+  // Pre-load all agent prompts
+  const agentPrompts = {};
+  for (const agent of agents) {
+    agentPrompts[agent.slug] = loadPrompt(agent.slug, agent.name, agent.title, agent.emoji);
+  }
+
+  // Agent roster for routing prompt
+  const agentRoster = agents
+    .map(a => `${a.slug} | ${a.name} | ${a.title}`)
+    .join('\n');
+
+  async function pickAgent(userMsg) {
+    const res = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 60,
+      messages: [{
+        role: 'user',
+        content: `You are a routing assistant. Pick the single best specialist for this message.\n\nTeam roster (slug | name | title):\n${agentRoster}\n\nUser message: "${userMsg}"\n\nReply with ONLY the slug. No explanation.`
+      }]
+    });
+    return res.content[0].text.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  }
+
+  coordinator.start(async (ctx) => {
+    await ctx.reply(
+      `Hey! I'm your *AI Team Coordinator* 🧠\n\nAsk me anything — I'll route you to the right specialist automatically.\n\nYour team: ${agents.map(a => `${a.emoji} ${a.name}`).join(', ')}`,
+      { parse_mode: 'Markdown' }
+    );
+  });
+
+  coordinator.command('team', async (ctx) => {
+    const list = agents.map(a => `${a.emoji} *${a.name}* — ${a.title}`).join('\n');
+    await ctx.reply(`*Your team:*\n\n${list}`, { parse_mode: 'Markdown' });
+  });
+
+  coordinator.on('text', async (ctx) => {
+    const userMsg = ctx.message.text;
+    if (userMsg.startsWith('/')) return;
+
+    const chatId = ctx.chat.id.toString();
+    await ctx.sendChatAction('typing');
+
+    try {
+      // Pick best agent
+      const slug = await pickAgent(userMsg);
+      const agent = agents.find(a => a.slug === slug) || agents[0];
+      const systemPrompt = agentPrompts[agent.slug];
+
+      // Load shared coordinator history
+      const history = getHistory.all(chatId, 'coordinator').reverse();
+      const messages = [
+        ...history.map(m => ({ role: m.role, content: m.content })),
+        { role: 'user', content: userMsg }
+      ];
+
+      const response = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages
+      });
+
+      const reply = response.content[0].text;
+
+      insertMsg.run(chatId, 'coordinator', 'user', userMsg);
+      insertMsg.run(chatId, 'coordinator', 'assistant', reply);
+
+      const header = `*${agent.name}* ${agent.emoji}\n\n`;
+      const full = header + reply;
+
+      if (full.length <= 4000) {
+        await ctx.reply(full, { parse_mode: 'Markdown' });
+      } else {
+        await ctx.reply(header, { parse_mode: 'Markdown' });
+        const chunks = reply.match(/.{1,4000}/gs) || [reply];
+        for (const chunk of chunks) {
+          await ctx.reply(chunk, { parse_mode: 'Markdown' });
+        }
+      }
+    } catch (err) {
+      console.error('[Coordinator] error:', err.message);
+      await ctx.reply('Sorry, hit a snag. Try again in a moment.');
+    }
+  });
+
+  const coordinatorPath = '/webhook/team-coordinator';
+  app.post(coordinatorPath, (req, res) => {
+    res.sendStatus(200);
+    coordinator.handleUpdate(req.body).catch(err => console.error('[Coordinator] update error:', err));
+  });
+
+  if (WEBHOOK_BASE) {
+    const fullUrl = `${WEBHOOK_BASE}${coordinatorPath}`;
+    coordinator.telegram.setWebhook(fullUrl)
+      .then(() => console.log(`✓ Team Coordinator → ${fullUrl}`))
+      .catch(e => console.error(`✗ Team Coordinator: ${e.message}`));
+  }
+
+  botsStarted++;
+  console.log('Team Coordinator loaded');
+}
+
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({ status: 'ok', bots: botsStarted });
